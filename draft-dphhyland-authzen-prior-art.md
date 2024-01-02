@@ -1,5 +1,9 @@
 
-# OIDC - OAuth 2.x
+This document provides a review of the various OAuth and OpenID specifications and how each supports the concept of authorization. 
+
+The purpose of this document is to provide context for the development of new standards within the AuthZen working group.
+
+# Prior Art: OIDC - OAuth 2.x
 
 Provides a protocol for the authorization of a client to access a resource on behalf of an End-User. 
 
@@ -14,7 +18,7 @@ The Authentication Request typically includes a consent flow through which the E
 
 Note: OAuth 0 OIDC ignore unknown scopes and claims (but is dependent upon the AS policy)
 
-I've covered here the core authorization flows of OIDC and OAuth - other standard such as CIBA do have further charateristics related to the authorization process. 
+I've covered here the core authorization flows of OIDC and OAuth - other standard such as CIBA do have further characteristics related to the authorization process. 
 
 
 ## Requests
