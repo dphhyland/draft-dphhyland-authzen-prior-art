@@ -7,7 +7,7 @@ The purpose of this document is to provide context for the development of new st
 
 Provides a protocol for the authorization of a client to access a resource on behalf of an End-User. 
 
-Standard OAuth 2.x spec provides for the authorization of the scopes requested by the cilent
+Standard OAuth 2.x spec provides for the authorization of the scopes requested by the cilent.
 
 Creates a Grant on the Authorization Server that describes the authorization of the access granted to the client. 
 
@@ -170,34 +170,128 @@ the RAR spec provides for the advertsiment of the RAR capability through the met
 
 The Grant Management API allows the client to manage the grants that it has been issued. This includes the ability to revoke or extend a clients grant. 
 
+The standard allows for APIs to query the status of a grant and to revoke a grant. 
+
+
 ```http
+
+GET /authorize?response_type=code&
+     client_id=s6BhdRkqt3
+     &grant_management_action=update
+     &grant_id=TSdqirmAxDa0_-DB_1bASQ
+     &scope=write
+     &redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb
+     &code_challenge_method=S256
+     &code_challenge=K2-ltc83acc4h... HTTP/1.1
+Host: as.example.com
 
 ```
 
+
 ## Responses
 
+OAuth token based authorization protocol where the response of the authorization is an access token that is then used by a "client" to access a resource. 
+
+OAuth 2.1 provides a more secure decoupled authorization flow where the client is issued an authorization code that is then exchanged for an access token.  The responses listed in this section are the responses which issue the bearer token used bu the client to access API resources. (shown in (4) below).
+
+``` http 
+
+
+     +--------+                               +---------------+
+     |        |--(1)- Authorization Request ->|   Resource    |
+     |        |                               |     Owner     |
+     |        |<-(2)-- Authorization Grant ---|               |
+     |        |                               +---------------+
+     |        |
+     |        |                               +---------------+
+     |        |--(3)-- Authorization Grant -->| Authorization |
+     | Client |                               |     Server    |
+     |        |<-(4)----- Access Token -------|               |
+     |        |                               +---------------+
+     |        |
+     |        |                               +---------------+
+     |        |--(5)----- Access Token ------>|    Resource   |
+     |        |                               |     Server    |
+     |        |<-(6)--- Protected Resource ---|               |
+     +--------+                               +---------------+
+
+
+```
 
 
 
 ### OIDC - OAuth2.x Response
 
-A successful client authorization request will result in a redirect to the client redirect_uri with the authorization code or token. 
+A standard OAuth 2.x response will return the access token and optionally the refresh token.  These tokens may be opaque or as JWTs. (RFC9068)
+
+The standard will ignore any unknown scopes requested by the client, and depending upon policy may ignore or reject claims.
+
+The authorization server MAY fully or partially ignore the scope requested by the client, based on the authorization server policy or the resource owner's instructions.  If the issued access token scope is different from the one requested by the client, the authorization server MUST include the "scope" response parameter to inform the client of the actual scope granted.
 
 ```http
 
-  HTTP/1.1 302 Found
-  Location: https://client.example.org/cb?
-    code=SplxlOBeZQQYbYS6WxSbIA
-    &state=af0ifjsldkj
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+   "access_token": "SlAV32hkKG",
+   "token_type": "Bearer",
+   "expires_in": 3600,
+   "refresh_token": "8xLOxBtZp8",
+   "scope": "cheese"
+}
 
 ```
 
+*OAuth 2.0 response with JWT access token*
+
+``` http 
+HTTP/1.1 200 OK
+Content-Type: application/json
+Cache-Control: no-store
+Pragma: no-cache
+
+{
+    "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2F1dGhvcml6YXRpb24tc2VydmVyLmV4YW1wbGUuY29tLyIsInN1YiI6IjViYTU1MmQ2NyIsImF1ZCI6Imh0dHBzOi8vcnMuZXhhbXBsZS5jb20vIiwiZXhwIjoxNjM5NTI4OTEyLCJpYXQiOjE2MTgzNTQwOTAsImp0aSI6ImRiZTM5YmYzYTNiYTQyMzhhNTEzZjUxZDZlMTY5MWM0IiwiY2xpZW50X2lkIjoiczZCaGRSa3F0MyIsInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgcmVhZGVtYWlsIn0.XXXXX",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "refresh_token": "XXXXX",
+    "scope": "openid profile reademail"
+}
+```
+
+``` json
+ {
+     "iss": "https://authorization-server.example.com/",
+     "sub": "5ba552d67",
+     "aud":   "https://rs.example.com/",
+     "exp": 1639528912,
+     "iat": 1618354090,
+     "jti" : "dbe39bf3a3ba4238a513f51d6e1691c4",
+     "client_id": "s6BhdRkqt3",
+     "scope": "openid profile reademail"
+   }
+```
 
 **Note**: Authorization Server Policy may be configured to ignore or reject unknown scopes and claims.
 
+
+
+
 #### Errors
 
+Depending upon the Authorization flow used by the client, there are a range of errors that may be returned. With particular regard to the auhtorization request, responses such as invalid_request, invalid_grant, invalid_Scope are defined which provide some signal to the reason for the error. 
 
+Note: Authentication Stepup as defined in RFC 9470 provides a mechanism for the Resource Server to signal that the client requires an Authentication Stepup by the End User. This is an Authentication and not an Authorization Stepup protocol responding to exceptions relating to the `max_age` and `acr_values`. 
+
+OAuth [2.1](https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-access-token)provides the following standard for errors relating to failed authorization request on a protected resource: 
+
+`If the protected resource request included an access token and failed authentication, the resource server SHOULD include the error attribute to provide the client with the reason why the access request was declined. The parameter value is described in Section 5.2.4. In addition, the resource server MAY include the error_description attribute to provide developers a human-readable explanation that is not meant to be displayed to end-users. It also MAY include the error_uri attribute with an absolute URI identifying a human-readable web page explaining the error. The error, error_description, and error_uri attributes MUST NOT appear more than once.`
+
+
+OAuth 2.0: https://datatracker.ietf.org/doc/html/rfc6749#autoid-56
+OAuth 2.1: https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-error-codes
+RFC 6750 - The OAuth 2.0 Authorization Framework: Bearer Token Usage: https://datatracker.ietf.org/doc/html/rfc6750#autoid-10 
 
 ### Rich Authorization Response
 
@@ -305,10 +399,50 @@ https://datatracker.ietf.org/doc/html/rfc9396#name-authorization-error-response
 
 ### Grant Management API Response
 
+The token response of an AS supporting the Grant Management API will include the grant_id that enables the client to manage and enquire on the grant. 
 
+The /grants API returns a JSON-formatted response that contains the grant_id and the grant status.  The provides the client insight into grant is holds, enabling monitoring-discovery of any latent grants that may be provided to the client through the consent process - e.g. multi-party consent flows. 
 
-#### Errors
+Note this response is not an access token. 
 
+```http
+HTTP/1.1 200 OK
+Cache-Control: no-cache, no-store
+Content-Type: application/json
+
+{
+   "scopes":[
+      {
+         "scope":"contacts read write",
+         "resources":[
+            "https://rs.example.com/api"
+         ]
+      },
+      {
+         "scope":"openid"
+      }
+   ],
+   "claims":[
+      "given_name",
+      "nickname",
+      "email",
+      "email_verified"
+   ],
+   "authorization_details":[
+      {
+         "type":"account_information",
+         "actions":[
+            "list_accounts",
+            "read_balances",
+            "read_transactions"
+         ],
+         "locations":[
+            "https://example.com/accounts"
+         ]
+      }
+   ]
+}
+```
 
 
 ## Specifications
@@ -332,3 +466,5 @@ Grant Management API: https://openid.net/specs/fapi-grant-management-01.html
 
 ### Authorization Semantics
 Resource Indictors for OAuth: https://www.rfc-editor.org/rfc/rfc8707.html
+JSON Web Token (JWT) Profile for OAuth 2.0 Access Tokens: https://datatracker.ietf.org/doc/html/rfc9068 
+OAuth 2.0 Step Up Authentication Challenge Protocol https://datatracker.ietf.org/doc/rfc9470/
