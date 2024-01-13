@@ -5,21 +5,39 @@ The purpose of this document is to provide context for the development of new st
 
 # Prior Art: OIDC - OAuth 2.x
 
-Provides a protocol for the authorization of a client to access a resource on behalf of an End-User. 
 
-Standard OAuth 2.x spec provides for the authorization of the scopes requested by the cilent.
+## Introduction
+
+OAuth describes a set of standards that define the protocols for the authorization of a client to access APIs. OIDC extends this protocol, by providing a user context to the authorization process, enabling access control to resources based on the identity of the user. 
+
+Until recently OAuth has provided limited mechanisms to describe the access rights of the client; however, recent developments in Open Ecosystems , such as Open Banking, and evolution of standards to support strong identity using verifiable credentials, have driven the development of new standards that provide a more expressive authorization process.
+
+This document provides a review of the various OAuth, OpenID and other standards emerging user agent protocols (such as digital wallets), with a particular focus on the available mechanisms used by the client to enquire and request authorization. 
+
+-- Quick overview of scopes , the concept of a grant and the introduction RAR.
+
+-- Comment on consent - single mention of the word in 6749 (re: CRSF), but not mention of 10.2 client impersonation - 8 mentions in Oauth2.1. 47 mentions in OIDC.
+
+-- Comment on how the protocol provides a context to the authorization request, but leaves the information related to the attributes, of subject, resource and action open. 
+
+-- Note that the if we reflect back on Authorization standards such as Xacml OAuth can be considered the enviornment - context.  
+
+-- Comment on the limitation of OAuth in its ability to enquire on the nature of its grant. While the .well-known endpoint provides information about what the AS supports, information about what access the is associated with the client grant has not been previously available until the introduction of the Grant Management API.. 
+
+-- Final note on challenges on limitations on the ability to signal back to the client the reason for the authorization failure. 
+
+-- Comment on the expansion of VC standards to use RAR to define response types. - Call for principles on the use of RAR and parameters.
+
 
 Creates a Grant on the Authorization Server that describes the authorization of the access granted to the client. 
 
 ODIC extends the authorization process to require the Authorization Server Authenticate the user to the client through the inclusion of the openid scope. 
+
 OIDC defines the ability to request identity information through the claims parameter,and allows the request to target the API the claim is return through i.e.userInfo and id_token endpoints.
 
 The Authentication Request typically includes a consent flow through which the End-User consents to the claims and scopes being requested by the client. 
 
-Note: OAuth 0 OIDC ignore unknown scopes and claims (but is dependent upon the AS policy)
-
 I've covered here the core authorization flows of OIDC and OAuth - other standard such as CIBA do have further characteristics related to the authorization process. 
-
 
 ## Requests
 
@@ -27,6 +45,10 @@ These request may require the consent or authorization of the end user or resour
 In some circumstances the request may be for a resource that is jointly owned and requires the consent/authorization of multiple parties.
 
 I'm being specific with the use of the term authorization here - as the OAuth spec uses the term authorization to describe the process of the client obtaining a token from the authorization server, however consent is also a form of authorization but has developed broader meaning through the development of Privacy regulations worldwide. 
+
+
+Note: OAuth 0 OIDC ignore unknown scopes and claims (but is dependent upon the AS policy)
+
 
 ### Standard OAuth RFC 6749
 
@@ -47,9 +69,9 @@ GET /authorize?
 ```
 
 There are a number of extension standards that provide alternative methods for requesting authorization: 
-_Pushed Authorization Requests (PAR): Requests provided via a Pushed Authorization Request (PAR) endpoint.
-_JWT-Secured Authorization Request (JAR): Requests encoded in a JWT and provided either within the request or via uri. 
-_Rich Authorization Requests (RAR): Authorization Details provided as json via the authorization_details parameter in the authorization request. (Note: authorzation_details may also be used on token refresh, however, this only narrows the scope of the returned token, and does not change the authorization of the client grant.) 
+- **Pushed Authorization Requests (PAR)**: Requests provided via a Pushed Authorization Request (PAR) endpoint.
+- **JWT-Secured Authorization Request (JAR)**: Requests encoded in a JWT and provided either within the request or via uri. 
+- **Rich Authorization Requests (RAR)**: Authorization Details provided as json via the authorization_details parameter in the authorization request. (Note: authorzation_details may also be used on token refresh, however, this only narrows the scope of the returned token, and does not change the authorization of the client grant.) 
 
 ###  OIDC Claims Request
 
@@ -82,6 +104,9 @@ GET /authorize?
 HTTP/1.1
 Host: server.example.com
 ```
+
+### Open ID for Verifiable 
+
 
 
 ### Rich Authorization Requests
@@ -190,9 +215,9 @@ Host: as.example.com
 
 ## Responses
 
-OAuth token based authorization protocol where the response of the authorization is an access token that is then used by a "client" to access a resource. 
+OAuth is token based authorization protocol where the response of the authorization is an access token that is then used by a "client" to access a resource. 
 
-OAuth 2.1 provides a more secure decoupled authorization flow where the client is issued an authorization code that is then exchanged for an access token.  The responses listed in this section are the responses which issue the bearer token used bu the client to access API resources. (shown in (4) below).
+OAuth 2.1 requires the more secure decoupled authorization flow where the client is issued an authorization code that is then exchanged for an access token.  The responses listed in this section are the responses which issue a bearer token used by the client to access API resources. (shown in flow (4) below).
 
 ``` http 
 
@@ -217,8 +242,6 @@ OAuth 2.1 provides a more secure decoupled authorization flow where the client i
 
 
 ```
-
-
 
 ### OIDC - OAuth2.x Response
 
@@ -274,9 +297,6 @@ Pragma: no-cache
 ```
 
 **Note**: Authorization Server Policy may be configured to ignore or reject unknown scopes and claims.
-
-
-
 
 #### Errors
 
@@ -339,9 +359,11 @@ Cache-Control: no-store
 }
 
 ```
-RAR also allows an AS to add further claims to the JWT presented to  the RS to assist in the RS processing 
+
+RAR also allows an AS to add further claims to the JWT presented to  the RS to assist in the RS processing (e.g. "debtorAccount" below)
 
 Taken from : https://datatracker.ietf.org/doc/html/rfc9396#name-jwt-based-access-tokens
+
 ```http
 
 {
@@ -393,7 +415,7 @@ The AuthZ response is the same as an OAuth 2.x response - however the authorizat
 
 The standard is thin on how to deal with errors in the authorization request - it is mostly focused on errors related to the data type (i.e. does not suggest range values) and does not provide any opportunity to communicate the reason for the error. (i.e. is it an authorization issue or a data issue).
 
-Authorization Errors defined by theRAR spec are focused on type excepts - no standards are defined for Authroization based exceptions
+Authorization Errors defined by the RAR spec are focused on type excepts - no standards are defined for Authroization based exceptions
 
 https://datatracker.ietf.org/doc/html/rfc9396#name-authorization-error-response
 
