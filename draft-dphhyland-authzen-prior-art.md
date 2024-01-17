@@ -5,39 +5,35 @@ The purpose of this document is to provide context for the development of new st
 
 # Prior Art: OIDC - OAuth 2.x
 
-
 ## Introduction
 
-OAuth describes a set of standards that define the protocols for the authorization of a client to access APIs. OIDC extends this protocol, by providing a user context to the authorization process, enabling access control to resources based on the identity of the user. 
+OAuth describes a set of standards that define the protocols for the authorization of a client to access APIs. OIDC extends the authorization capability of this protocol, by providing a user context to the authorization process, enabling access control to resources based on the identity of the user. Until recently OAuth has provided few mechanisms to describe the access rights of the client; however, recent developments in open ecosystems, such as Open Banking, and evolution of standards to support strong identity using verifiable credentials have driven the development of new standards which provide a more expressive authorization process. This document provides a review of the various OAuth and OpenID standards, with a particular focus on the available mechanisms used by the client to enquire and request authorization for an end-user. 
 
-Until recently OAuth has provided limited mechanisms to describe the access rights of the client; however, recent developments in Open Ecosystems , such as Open Banking, and evolution of standards to support strong identity using verifiable credentials, have driven the development of new standards that provide a more expressive authorization process.
+Conceptually and in practice there are four key activities in OAuth that perform an authorization function:
+- **Client Authorization Request ( /authorize | /par | /bc-authorize )**: Invoked by the user agent/client on the Authorization Server (AS) for the purposes of obtaining an access token. This performs an authorization of attributes provided in the request: if successful returns an authorization code (code flow) or access token(other); if unsuccessful returns an error.
+- **Token Request (/token)**: The issuance of a token to the client validates the state of the grant, and any specific authorization parameters provided with the authorization request. 
+- **Resource Server Authorization (incl /userInfo)**: This is the verification the token presented to the resource server is valid and that the token has the required authorization to access the resource.
+- **Grant Management Enquiry (/grants)**: While this api does not act as an authorization control, it does return the authorization state of the client grant.
 
-This document provides a review of the various OAuth, OpenID and other standards emerging user agent protocols (such as digital wallets), with a particular focus on the available mechanisms used by the client to enquire and request authorization. 
+**User Agent/Client Authorization**: Today there are a number of mechanisms in OAuth and OIDC that enable the client to communicate its Authorization requirement: Within the Authorization Request through Scopes (including finer grained claims defined within OIDC) (REF)[] the authorization_details request parameter defined within the RAR standard, and on the token request through the authorization_details [REF]() parameter. Recently presentation_definition has also been introduced to enable a Verifier to request a Verifiable Presentation from a Holder [REF]() - this attribute type is specific the syntax defined by Section 5 of [DIF.Presentation Exchange](https://specs.identity.foundation/presentation-exchange/spec/v2.0.0/) (**this raises the question on how to consider the authorization_details attribute type**) Each of these attributes enable a user agent/client to describe the authorization it requires ( *from a traditional AS or Wallet* ), which may automatically authorize the request or trigger end user interaction from one or many users that hold ownership over the resources the authorization is being requested for.
 
--- Quick overview of scopes , the concept of a grant and the introduction RAR.
+**Consent**: Consent is increasingly used within digital activities to capture end user authorization to act on user data. Consent is captured  in many ways and for many different reasons, and has become a key component of privacy regulations such as GDPR. Schemes such as Open Banking have also adopted the concept of consent for the capture and use of data by third parties, which has driven the adoption of OIDC/FAPI use cases which employ the capture of consent over a wide range of scopes beyond that defined in the OIDC standard. Open Banking has also opened a degree of ambiguity in the concept of consent through the authorization requirement over joint accounts, with the capture "consent" of multiple parties for jointly owned Bank Accounts. From an OAuth/OIDC point of view, this user interaction is outside of the standard, and transparent to the client - which presents challenges to the client in understanding the authorization it has been granted. While recent standards such as the (Grant Management API)[] attempt to provide the client with insight into the authorization granted, for reasons of privacy, it is not possible to provide the authorization requirement of jointly held resources. There is a need for further standards in this space to signal to the client that there are outstanding end user activities to be completed - and potentially provide the client information on how to obtain this authorization.
 
--- Comment on consent - single mention of the word in 6749 (re: CRSF), but not mention of 10.2 client impersonation - 8 mentions in Oauth2.1. 47 mentions in OIDC.
+**User Agent/Client Visibility**: Conceptually OAuth and OIDC standards related to authorization are specific to the Authorization requirement for the user agent/client which requires access to user data. This stems from the origins of OAuth which did not hold the concept of identity of the end-user and thus the inferred access that user may have over a resource. Applying this concept consistently through to the Grant Management API and authorization responses such as authorization_details, does provide the framework for transparency to what authorizations are owned by the client and that owned by the user(s). (For example the client may have obtained a consent for a user to make a payment, that is not the same as the user in control of the user agent). 
 
--- Comment on how the protocol provides a context to the authorization request, but leaves the information related to the attributes, of subject, resource and action open. 
+This concept needs to be considered carefully when looking to extend OAuth to to better support the authorization - the authorization of a client may be different to that if the user - and any standards that are developed need to be clear on the authorization context and the authority the user-agent/client holds.
 
--- Note that the if we reflect back on Authorization standards such as Xacml OAuth can be considered the enviornment - context.  
+-- Need to understand the relationship between the AS and RS here and if there 
 
--- Comment on the limitation of OAuth in its ability to enquire on the nature of its grant. While the .well-known endpoint provides information about what the AS supports, information about what access the is associated with the client grant has not been previously available until the introduction of the Grant Management API.. 
+**Authorization Signalling**:communicating to the client authorization state is poorly defined in OAuth/OIDC standards. Recent standards relating to [Authentication Stepup]() have been defined, the [Grant Management API] now provides insight in the the currently held grant of a client, but otherwise generic HTTP error codes are used to signal authorization outcomes to a client. 
 
--- Final note on challenges on limitations on the ability to signal back to the client the reason for the authorization failure. 
-
--- Comment on the expansion of VC standards to use RAR to define response types. - Call for principles on the use of RAR and parameters.
+**Authorization Metadata**: 
 
 
-Creates a Grant on the Authorization Server that describes the authorization of the access granted to the client. 
+**Resource Authorization**: 
 
-ODIC extends the authorization process to require the Authorization Server Authenticate the user to the client through the inclusion of the openid scope. 
+**OpenID for Verifiable Credentials**: 
 
-OIDC defines the ability to request identity information through the claims parameter,and allows the request to target the API the claim is return through i.e.userInfo and id_token endpoints.
-
-The Authentication Request typically includes a consent flow through which the End-User consents to the claims and scopes being requested by the client. 
-
-I've covered here the core authorization flows of OIDC and OAuth - other standard such as CIBA do have further characteristics related to the authorization process. 
 
 ## Requests
 
@@ -55,6 +51,8 @@ Note: OAuth 0 OIDC ignore unknown scopes and claims (but is dependent upon the A
 Request for the return of an Access Token (and optionally a Refresh Token) from the Authorization Server, which will grant a client access to a resource on behalf of a End-User. 
 
 The scope parameter is used to describe the access that the client is requesting.
+scopes
+
 
 ```http
  
@@ -72,6 +70,10 @@ There are a number of extension standards that provide alternative methods for r
 - **Pushed Authorization Requests (PAR)**: Requests provided via a Pushed Authorization Request (PAR) endpoint.
 - **JWT-Secured Authorization Request (JAR)**: Requests encoded in a JWT and provided either within the request or via uri. 
 - **Rich Authorization Requests (RAR)**: Authorization Details provided as json via the authorization_details parameter in the authorization request. (Note: authorzation_details may also be used on token refresh, however, this only narrows the scope of the returned token, and does not change the authorization of the client grant.) 
+
+Extensions to authorization request:
+- resource: Section 2 RFC 8707 Resource Indicators for OAuth 2.0 https://www.rfc-editor.org/rfc/rfc8707
+- authorization_details: RAR
 
 ###  OIDC Claims Request
 
@@ -105,7 +107,7 @@ HTTP/1.1
 Host: server.example.com
 ```
 
-### Open ID for Verifiable 
+### Open ID for Verifiable Credentials
 
 
 
@@ -172,9 +174,9 @@ Host: server.example.com
 ```
 URL Decoded "authorization_details
 
-The only mandatory parameter is the type parameter. The type parameter is a string that identifies the type of the authorization details. All other parameters are optional and up to the implementer to define. 
+- The only mandatory parameter is the type parameter. The type parameter is a string that identifies the type of the authorization details. All other parameters are optional and up to the implementer to define. 
 
-An Authorization Request may also be placed on the token endpoint; however, this only narrows the scope of the returned token and does not change the authorization of the client grant. When this token is presented to the resource server the narrowed token scope is enforced.  
+- An Authorization Request may also be placed on the token endpoint; however, this only narrows the scope of the returned token and does not change the authorization of the client grant. When this token is presented to the resource server the narrowed token scope is enforced.  
 
 #### Metadata
 https://datatracker.ietf.org/doc/html/rfc9396#name-metadata
@@ -197,6 +199,12 @@ The Grant Management API allows the client to manage the grants that it has been
 
 The standard allows for APIs to query the status of a grant and to revoke a grant. 
 
+To call the GM API the client requires authorization of the following scopes [Section 6.1](https://openid.net/specs/fapi-grant-management-01.html#name-api-authorization): 
+- grant_management_query
+- grant_management_revoke
+
+
+#### Update a Grant
 
 ```http
 
@@ -212,6 +220,13 @@ Host: as.example.com
 
 ```
 
+#### Grant Enquiry 
+
+```http 
+GET /grants/TSdqirmAxDa0_-DB_1bASQ
+Host: as.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+```
 
 ## Responses
 
@@ -471,6 +486,8 @@ Content-Type: application/json
 
 ### General Method for Requesting Authorization over http
 OAuth 2.0: https://datatracker.ietf.org/doc/html/rfc6749
+The OAuth 2.0 Authorization Framework: Bearer Token Usage: https://www.rfc-editor.org/rfc/rfc6750
+Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants: https://www.rfc-editor.org/rfc/rfc7521.html
 
 ### Methods for Requesting Authorization to specialized Data Types  
 OpenID Connect Core: https://openid.net/specs/openid-connect-core-1_0.html  - for Authorization to identity data in via id_token and /userInfo API
