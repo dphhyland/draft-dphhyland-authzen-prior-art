@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Prior Art&colon; OIDC - OAuth 2&period;x</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <p>This document provides a review of the various OAuth and OpenID specifications and how each supports the concept of authorization.</p>
+<p>The purpose of this document is to provide context for the development of new standards within the AuthZen working group.</p>
+<h1 id="prior-art-oidc---oauth-2x">Prior Art: OIDC - OAuth 2.x</h1>
+<h2 id="introduction">Introduction</h2>
+<p>OAuth describes a set of standards that define the protocols for the authorization of a client to access APIs. OIDC extends the authorization capability of this protocol, by providing a user context to the authorization process, enabling access control to resources based on the identity of the user. Until recently OAuth has provided few mechanisms to describe the access rights of the client; however, recent developments in open ecosystems, such as Open Banking, and evolution of standards to support strong identity using verifiable credentials have driven the development of new standards which provide a more expressive authorization process. This document provides a review of the various OAuth and OpenID standards, with a particular focus on the available mechanisms used by the client to enquire and request authorization for an end-user.</p>
+<p>Conceptually and in practice there are four key activities in OAuth that perform an authorization function:</p>
+<ul>
+<li><strong>Client Authorization Request ( /authorize | /par | /bc-authorize )</strong>: Invoked by the user agent/client on the Authorization Server (AS) for the purposes of obtaining an access token. This performs an authorization of attributes provided in the request: if successful returns an authorization code (code flow) or access token(other); if unsuccessful returns an error.</li>
+<li><strong>Token Request (/token)</strong>: The issuance of a token to the client validates the state of the grant, and any specific authorization parameters provided with the authorization request.</li>
+<li><strong>Resource Server Authorization (incl /userInfo)</strong>: This is the verification the token presented to the resource server is valid and that the token has the required authorization to access the resource.</li>
+<li><strong>Grant Management Enquiry (/grants)</strong>: While this api does not act as an authorization control, it does return the authorization state of the client grant.</li>
+</ul>
+<p><strong>User Agent/Client Authorization</strong>: Today there are a number of mechanisms in OAuth and OIDC that enable the client to communicate its Authorization requirement: Within the Authorization Request through Scopes (including finer grained claims defined within OIDC) (REF)[] the authorization_details request parameter defined within the RAR standard, and on the token request through the authorization_details <a href="">REF</a> parameter. Recently presentation_definition has also been introduced to enable a Verifier to request a Verifiable Presentation from a Holder <a href="">REF</a> - this attribute type is specific the syntax defined by Section 5 of <a href="https://specs.identity.foundation/presentation-exchange/spec/v2.0.0/">DIF.Presentation Exchange</a> (<strong>this raises the question on how to consider the authorization_details attribute type</strong>) Each of these attributes enable a user agent/client to describe the authorization it requires ( <em>from a traditional AS or Wallet</em> ), which may automatically authorize the request or trigger end user interaction from one or many users that hold ownership over the resources the authorization is being requested for.</p>
+<p><strong>Consent</strong>: Consent is increasingly used within digital activities to capture end user authorization to act on user data. Consent is captured  in many ways and for many different reasons, and has become a key component of privacy regulations such as GDPR. Schemes such as Open Banking have also adopted the concept of consent for the capture and use of data by third parties, which has driven the adoption of OIDC/FAPI use cases which employ the capture of consent over a wide range of scopes beyond that defined in the OIDC standard. Open Banking has also opened a degree of ambiguity in the concept of consent through the authorization requirement over joint accounts, with the capture &quot;consent&quot; of multiple parties for jointly owned Bank Accounts. From an OAuth/OIDC point of view, this user interaction is outside of the standard, and transparent to the client - which presents challenges to the client in understanding the authorization it has been granted. While recent standards such as the (Grant Management API)[] attempt to provide the client with insight into the authorization granted, for reasons of privacy, it is not possible to provide the authorization requirement of jointly held resources. There is a need for further standards in this space to signal to the client that there are outstanding end user activities to be completed - and potentially provide the client information on how to obtain this authorization.</p>
+<p><strong>User Agent/Client Visibility</strong>: Conceptually OAuth and OIDC standards related to authorization are specific to the Authorization requirement for the user agent/client which requires access to user data. This stems from the origins of OAuth which did not hold the concept of identity of the end-user and thus the inferred access that user may have over a resource. Applying this concept consistently through to the Grant Management API and authorization responses such as authorization_details, does provide the framework for transparency to what authorizations are owned by the client and that owned by the user(s). (For example the client may have obtained a consent for a user to make a payment, that is not the same as the user in control of the user agent).</p>
+<p>This concept needs to be considered carefully when looking to extend OAuth to to better support the authorization - the authorization of a client may be different to that if the user - and any standards that are developed need to be clear on the authorization context and the authority the user-agent/client holds.</p>
+<p>-- Need to understand the relationship between the AS and RS here and if there</p>
+<p><strong>Authorization Signalling</strong>:communicating to the client authorization state is poorly defined in OAuth/OIDC standards. Recent standards relating to <a href="">Authentication Stepup</a> have been defined, the [Grant Management API] now provides insight in the the currently held grant of a client, but otherwise generic HTTP error codes are used to signal authorization outcomes to a client.</p>
+<p><strong>Authorization Metadata</strong>:</p>
+<p><strong>Resource Authorization</strong>:</p>
+<p><strong>OpenID for Verifiable Credentials</strong>:</p>
+<h2 id="requests">Requests</h2>
+<p>These request may require the consent or authorization of the end user or resource owner.
+In some circumstances the request may be for a resource that is jointly owned and requires the consent/authorization of multiple parties.</p>
+<p>I'm being specific with the use of the term authorization here - as the OAuth spec uses the term authorization to describe the process of the client obtaining a token from the authorization server, however consent is also a form of authorization but has developed broader meaning through the development of Privacy regulations worldwide.</p>
+<p>Note: OAuth 0 OIDC ignore unknown scopes and claims (but is dependent upon the AS policy)</p>
+<h3 id="standard-oauth-rfc-6749">Standard OAuth RFC 6749</h3>
+<p>Request for the return of an Access Token (and optionally a Refresh Token) from the Authorization Server, which will grant a client access to a resource on behalf of a End-User.</p>
+<p>The scope parameter is used to describe the access that the client is requesting.
+scopes</p>
+<pre><code class="language-http"> 
+GET /authorize?
+    response_type=code&amp;
+    client_id=s6BhdRkqt3&amp;state=xyz&amp;
+    redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb&amp;
+    **scope=openid%20profile&amp;**
+    
+    HTTP/1.1
+
+</code></pre>
+<p>There are a number of extension standards that provide alternative methods for requesting authorization:</p>
+<ul>
+<li><strong>Pushed Authorization Requests (PAR)</strong>: Requests provided via a Pushed Authorization Request (PAR) endpoint.</li>
+<li><strong>JWT-Secured Authorization Request (JAR)</strong>: Requests encoded in a JWT and provided either within the request or via uri.</li>
+<li><strong>Rich Authorization Requests (RAR)</strong>: Authorization Details provided as json via the authorization_details parameter in the authorization request. (Note: authorzation_details may also be used on token refresh, however, this only narrows the scope of the returned token, and does not change the authorization of the client grant.)</li>
+</ul>
+<p>Extensions to authorization request:</p>
+<ul>
+<li>resource: Section 2 RFC 8707 Resource Indicators for OAuth 2.0 <a href="https://www.rfc-editor.org/rfc/rfc8707">https://www.rfc-editor.org/rfc/rfc8707</a></li>
+<li>authorization_details: RAR</li>
+</ul>
+<h3 id="oidc-claims-request">OIDC Claims Request</h3>
+<p><a href="https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter">https://openid.net/specs/openid-connect-core-1_0.html#ClaimsParameter</a></p>
+<pre><code class="language-http">GET /authorize?
+    response_type=code&amp;
+    client_id=s6BhdRkqt3&amp;
+    scope=openid%20profile%20email&amp;
+    redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb&amp;
+    state=xyz&amp;
+    nonce=n-0S6_WzA2Mj&amp;
+    claims=
+    {
+        &quot;userinfo&quot;:
+        {
+            &quot;given_name&quot;: {&quot;essential&quot;: true},
+            &quot;nickname&quot;: null,
+            &quot;email&quot;: {&quot;essential&quot;: true},
+            &quot;email_verified&quot;: {&quot;essential&quot;: true},
+            &quot;picture&quot;: null
+        },
+        &quot;id_token&quot;:
+        {
+            &quot;auth_time&quot;: {&quot;essential&quot;: true},
+            &quot;acr&quot;: {&quot;values&quot;: [&quot;urn:mace:incommon:iap:silver&quot;]}
+        }
+    }
+HTTP/1.1
+<span class="hljs-attribute">Host</span><span class="hljs-punctuation">: </span>server.example.com
+</code></pre>
+<h3 id="open-id-for-verifiable-credentials">Open ID for Verifiable Credentials</h3>
+<h3 id="rich-authorization-requests">Rich Authorization Requests</h3>
+<pre><code class="language-http">GET /authorize?response_type=code
+   &amp;client_id=s6BhdRkqt3
+   &amp;state=af0ifjsldkj
+   &amp;redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb
+   &amp;code_challenge_method=S256
+   &amp;code_challenge=K2-ltc83acc4h0c9w6ESC_rEMTJ3bwc-uCHaoeK1t8U
+   &amp;authorization_details=%5B%7B%22type%22%3A%22account%5Finfo
+   rmation%22%2C%22actions%22%3A%5B%22list%5Faccounts%22%2C%22
+   read%5Fbalances%22%2C%22read%5Ftransactions%22%5D%2C%22loca
+   tions%22%3A%5B%22https%3A%2F%2Fexample%2Ecom%2Faccounts%22%
+   5D%7D%2C%7B%22type%22%3A%22payment%5Finitiation%22%2C%22act
+   ions%22%3A%5B%22initiate%22%2C%22status%22%2C%22cancel%22%5
+   D%2C%22locations%22%3A%5B%22https%3A%2F%2Fexample%2Ecom%2Fp
+   ayments%22%5D%2C%22instructedAmount%22%3A%7B%22currency%22%
+   3A%22EUR%22%2C%22amount%22%3A%22123%2E50%22%7D%2C%22credito
+   rName%22%3A%22Merchant%20A%22%2C%22creditorAccount%22%3A%7B
+   %22iban%22%3A%22DE02100100109307118603%22%7D%2C%22remittanc
+   eInformationUnstructured%22%3A%22Ref%20Number%20Merchant%22
+   %7D%5D HTTP/1.1
+<span class="hljs-attribute">Host</span><span class="hljs-punctuation">: </span>server.example.com
+
+</code></pre>
+<pre><code class="language-json"><span class="hljs-punctuation">[</span>
+   <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;account_information&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+         <span class="hljs-string">&quot;list_accounts&quot;</span><span class="hljs-punctuation">,</span>
+         <span class="hljs-string">&quot;read_balances&quot;</span><span class="hljs-punctuation">,</span>
+         <span class="hljs-string">&quot;read_transactions&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;locations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+         <span class="hljs-string">&quot;https://example.com/accounts&quot;</span>
+      <span class="hljs-punctuation">]</span>
+   <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+   <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;payment_initiation&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+         <span class="hljs-string">&quot;initiate&quot;</span><span class="hljs-punctuation">,</span>
+         <span class="hljs-string">&quot;status&quot;</span><span class="hljs-punctuation">,</span>
+         <span class="hljs-string">&quot;cancel&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;locations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+         <span class="hljs-string">&quot;https://example.com/payments&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;instructedAmount&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+         <span class="hljs-attr">&quot;currency&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;EUR&quot;</span><span class="hljs-punctuation">,</span>
+         <span class="hljs-attr">&quot;amount&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;123.50&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;creditorName&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Merchant A&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;creditorAccount&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+         <span class="hljs-attr">&quot;iban&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;DE02100100109307118603&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;remittanceInformationUnstructured&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Ref Number Merchant&quot;</span>
+   <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">]</span>
+</code></pre>
+<p>URL Decoded &quot;authorization_details</p>
+<ul>
+<li>
+<p>The only mandatory parameter is the type parameter. The type parameter is a string that identifies the type of the authorization details. All other parameters are optional and up to the implementer to define.</p>
+</li>
+<li>
+<p>An Authorization Request may also be placed on the token endpoint; however, this only narrows the scope of the returned token and does not change the authorization of the client grant. When this token is presented to the resource server the narrowed token scope is enforced.</p>
+</li>
+</ul>
+<h4 id="metadata">Metadata</h4>
+<p><a href="https://datatracker.ietf.org/doc/html/rfc9396#name-metadata">https://datatracker.ietf.org/doc/html/rfc9396#name-metadata</a></p>
+<p>the RAR spec provides for the advertsiment of the RAR capability through the metadata endpoint.</p>
+<pre><code class="language-http">   ...
+   &quot;authorization_details_types_supported&quot;:[
+      &quot;payment_initiation&quot;,
+      &quot;account_information&quot;
+   ]
+}
+</code></pre>
+<h3 id="grant-management-api">Grant Management API</h3>
+<p>The Grant Management API allows the client to manage the grants that it has been issued. This includes the ability to revoke or extend a clients grant.</p>
+<p>The standard allows for APIs to query the status of a grant and to revoke a grant.</p>
+<p>To call the GM API the client requires authorization of the following scopes <a href="https://openid.net/specs/fapi-grant-management-01.html#name-api-authorization">Section 6.1</a>:</p>
+<ul>
+<li>grant_management_query</li>
+<li>grant_management_revoke</li>
+</ul>
+<h4 id="update-a-grant">Update a Grant</h4>
+<pre><code class="language-http">
+GET /authorize?response_type=code&amp;
+     client_id=s6BhdRkqt3
+     &amp;grant_management_action=update
+     &amp;grant_id=TSdqirmAxDa0_-DB_1bASQ
+     &amp;scope=write
+     &amp;redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb
+     &amp;code_challenge_method=S256
+     &amp;code_challenge=K2-ltc83acc4h... HTTP/1.1
+<span class="hljs-attribute">Host</span><span class="hljs-punctuation">: </span>as.example.com
+
+</code></pre>
+<h4 id="grant-enquiry">Grant Enquiry</h4>
+<pre><code class="language-http">GET /grants/TSdqirmAxDa0_-DB_1bASQ
+<span class="hljs-attribute">Host</span><span class="hljs-punctuation">: </span>as.example.com
+<span class="hljs-attribute">Authorization</span><span class="hljs-punctuation">: </span>Bearer 2YotnFZFEjr1zCsicMWpAA
+</code></pre>
+<h2 id="responses">Responses</h2>
+<p>OAuth is token based authorization protocol where the response of the authorization is an access token that is then used by a &quot;client&quot; to access a resource.</p>
+<p>OAuth 2.1 requires the more secure decoupled authorization flow where the client is issued an authorization code that is then exchanged for an access token.  The responses listed in this section are the responses which issue a bearer token used by the client to access API resources. (shown in flow (4) below).</p>
+<pre><code class="language-http">
+
+     +--------+                               +---------------+
+     |        |--(1)- Authorization Request -&gt;|   Resource    |
+     |        |                               |     Owner     |
+     |        |&lt;-(2)-- Authorization Grant ---|               |
+     |        |                               +---------------+
+     |        |
+     |        |                               +---------------+
+     |        |--(3)-- Authorization Grant --&gt;| Authorization |
+     | Client |                               |     Server    |
+     |        |&lt;-(4)----- Access Token -------|               |
+     |        |                               +---------------+
+     |        |
+     |        |                               +---------------+
+     |        |--(5)----- Access Token ------&gt;|    Resource   |
+     |        |                               |     Server    |
+     |        |&lt;-(6)--- Protected Resource ---|               |
+     +--------+                               +---------------+
+
+
+</code></pre>
+<h3 id="oidc---oauth2x-response">OIDC - OAuth2.x Response</h3>
+<p>A standard OAuth 2.x response will return the access token and optionally the refresh token.  These tokens may be opaque or as JWTs. (RFC9068)</p>
+<p>The standard will ignore any unknown scopes requested by the client, and depending upon policy may ignore or reject claims.</p>
+<p>The authorization server MAY fully or partially ignore the scope requested by the client, based on the authorization server policy or the resource owner's instructions.  If the issued access token scope is different from the one requested by the client, the authorization server MUST include the &quot;scope&quot; response parameter to inform the client of the actual scope granted.</p>
+<pre><code class="language-http">
+<span class="hljs-meta">HTTP/1.1</span> <span class="hljs-number">200</span> OK
+<span class="hljs-attribute">Content-Type</span><span class="hljs-punctuation">: </span>application/json
+
+<span class="language-json"><span class="hljs-punctuation">{</span>
+   <span class="hljs-attr">&quot;access_token&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SlAV32hkKG&quot;</span><span class="hljs-punctuation">,</span>
+   <span class="hljs-attr">&quot;token_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Bearer&quot;</span><span class="hljs-punctuation">,</span>
+   <span class="hljs-attr">&quot;expires_in&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span><span class="hljs-punctuation">,</span>
+   <span class="hljs-attr">&quot;refresh_token&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8xLOxBtZp8&quot;</span><span class="hljs-punctuation">,</span>
+   <span class="hljs-attr">&quot;scope&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cheese&quot;</span>
+<span class="hljs-punctuation">}</span>
+
+</span></code></pre>
+<p><em>OAuth 2.0 response with JWT access token</em></p>
+<pre><code class="language-http"><span class="hljs-meta">HTTP/1.1</span> <span class="hljs-number">200</span> OK
+<span class="hljs-attribute">Content-Type</span><span class="hljs-punctuation">: </span>application/json
+<span class="hljs-attribute">Cache-Control</span><span class="hljs-punctuation">: </span>no-store
+<span class="hljs-attribute">Pragma</span><span class="hljs-punctuation">: </span>no-cache
+
+<span class="language-json"><span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;access_token&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2F1dGhvcml6YXRpb24tc2VydmVyLmV4YW1wbGUuY29tLyIsInN1YiI6IjViYTU1MmQ2NyIsImF1ZCI6Imh0dHBzOi8vcnMuZXhhbXBsZS5jb20vIiwiZXhwIjoxNjM5NTI4OTEyLCJpYXQiOjE2MTgzNTQwOTAsImp0aSI6ImRiZTM5YmYzYTNiYTQyMzhhNTEzZjUxZDZlMTY5MWM0IiwiY2xpZW50X2lkIjoiczZCaGRSa3F0MyIsInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgcmVhZGVtYWlsIn0.XXXXX&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;token_type&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Bearer&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;expires_in&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;refresh_token&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;XXXXX&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;scope&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;openid profile reademail&quot;</span>
+<span class="hljs-punctuation">}</span>
+</span></code></pre>
+<pre><code class="language-json"> <span class="hljs-punctuation">{</span>
+     <span class="hljs-attr">&quot;iss&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;https://authorization-server.example.com/&quot;</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;sub&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5ba552d67&quot;</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;aud&quot;</span><span class="hljs-punctuation">:</span>   <span class="hljs-string">&quot;https://rs.example.com/&quot;</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;exp&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1639528912</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;iat&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1618354090</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;jti&quot;</span> <span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;dbe39bf3a3ba4238a513f51d6e1691c4&quot;</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;client_id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;s6BhdRkqt3&quot;</span><span class="hljs-punctuation">,</span>
+     <span class="hljs-attr">&quot;scope&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;openid profile reademail&quot;</span>
+   <span class="hljs-punctuation">}</span>
+</code></pre>
+<p><strong>Note</strong>: Authorization Server Policy may be configured to ignore or reject unknown scopes and claims.</p>
+<h4 id="errors">Errors</h4>
+<p>Depending upon the Authorization flow used by the client, there are a range of errors that may be returned. With particular regard to the auhtorization request, responses such as invalid_request, invalid_grant, invalid_Scope are defined which provide some signal to the reason for the error.</p>
+<p>Note: Authentication Stepup as defined in RFC 9470 provides a mechanism for the Resource Server to signal that the client requires an Authentication Stepup by the End User. This is an Authentication and not an Authorization Stepup protocol responding to exceptions relating to the <code>max_age</code> and <code>acr_values</code>.</p>
+<p>OAuth <a href="https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-access-token">2.1</a>provides the following standard for errors relating to failed authorization request on a protected resource:</p>
+<p><code>If the protected resource request included an access token and failed authentication, the resource server SHOULD include the error attribute to provide the client with the reason why the access request was declined. The parameter value is described in Section 5.2.4. In addition, the resource server MAY include the error_description attribute to provide developers a human-readable explanation that is not meant to be displayed to end-users. It also MAY include the error_uri attribute with an absolute URI identifying a human-readable web page explaining the error. The error, error_description, and error_uri attributes MUST NOT appear more than once.</code></p>
+<p>OAuth 2.0: <a href="https://datatracker.ietf.org/doc/html/rfc6749#autoid-56">https://datatracker.ietf.org/doc/html/rfc6749#autoid-56</a>
+OAuth 2.1: <a href="https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-error-codes">https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-error-codes</a>
+RFC 6750 - The OAuth 2.0 Authorization Framework: Bearer Token Usage: <a href="https://datatracker.ietf.org/doc/html/rfc6750#autoid-10">https://datatracker.ietf.org/doc/html/rfc6750#autoid-10</a></p>
+<h3 id="rich-authorization-response">Rich Authorization Response</h3>
+<p><a href="https://datatracker.ietf.org/doc/html/rfc9396#name-token-response">https://datatracker.ietf.org/doc/html/rfc9396#name-token-response</a></p>
+<p>This returns a token which may be enriched by the Authorization Server.</p>
+<p>Policies may be configured to ignore or reject unknown authorization_details types.</p>
+<p>If the access token is a JWT then it may contain the authorization details.</p>
+<pre><code class="language-http">
+<span class="hljs-meta">HTTP/1.1</span> <span class="hljs-number">200</span> OK
+<span class="hljs-attribute">Content-Type</span><span class="hljs-punctuation">: </span>application/json
+<span class="hljs-attribute">Cache-Control</span><span class="hljs-punctuation">: </span>no-store
+
+<span class="language-prolog">{
+   <span class="hljs-string">&quot;access_token&quot;</span>: <span class="hljs-string">&quot;2YotnFZFEjr1zCsicMWpAA&quot;</span>,
+   <span class="hljs-string">&quot;token_type&quot;</span>: <span class="hljs-string">&quot;example&quot;</span>,
+   <span class="hljs-string">&quot;expires_in&quot;</span>: <span class="hljs-number">3600</span>,
+   <span class="hljs-string">&quot;refresh_token&quot;</span>: <span class="hljs-string">&quot;tGzv3JOkF0XG5Qx2TlKWIA&quot;</span>,
+   <span class="hljs-string">&quot;authorization_details&quot;</span>: [
+      {
+         <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;payment_initiation&quot;</span>,
+         <span class="hljs-string">&quot;actions&quot;</span>: [
+            <span class="hljs-string">&quot;initiate&quot;</span>,
+            <span class="hljs-string">&quot;status&quot;</span>,
+            <span class="hljs-string">&quot;cancel&quot;</span>
+         ],
+         <span class="hljs-string">&quot;locations&quot;</span>: [
+            <span class="hljs-string">&quot;https://example.com/payments&quot;</span>
+         ],
+         <span class="hljs-string">&quot;instructedAmount&quot;</span>: {
+            <span class="hljs-string">&quot;currency&quot;</span>: <span class="hljs-string">&quot;EUR&quot;</span>,
+            <span class="hljs-string">&quot;amount&quot;</span>: <span class="hljs-string">&quot;123.50&quot;</span>
+         },
+         <span class="hljs-string">&quot;creditorName&quot;</span>: <span class="hljs-string">&quot;Merchant A&quot;</span>,
+         <span class="hljs-string">&quot;creditorAccount&quot;</span>: {
+            <span class="hljs-string">&quot;iban&quot;</span>: <span class="hljs-string">&quot;DE02100100109307118603&quot;</span>
+         },
+         <span class="hljs-string">&quot;remittanceInformationUnstructured&quot;</span>: <span class="hljs-string">&quot;Ref Number Merchant&quot;</span>
+      }
+   ]
+}
+
+</span></code></pre>
+<p>RAR also allows an AS to add further claims to the JWT presented to  the RS to assist in the RS processing (e.g. &quot;debtorAccount&quot; below)</p>
+<p>Taken from : <a href="https://datatracker.ietf.org/doc/html/rfc9396#name-jwt-based-access-tokens">https://datatracker.ietf.org/doc/html/rfc9396#name-jwt-based-access-tokens</a></p>
+<pre><code class="language-http">
+{
+   &quot;iss&quot;: &quot;https://as.example.com&quot;,
+   &quot;sub&quot;: &quot;24400320&quot;,
+   &quot;aud&quot;: &quot;a7AfcPcsl2&quot;,
+   &quot;exp&quot;: 1311281970,
+   &quot;acr&quot;: &quot;psd2_sca&quot;,
+   &quot;txn&quot;: &quot;8b4729cc-32e4-4370-8cf0-5796154d1296&quot;,
+   &quot;authorization_details&quot;: [
+      {
+         &quot;type&quot;: &quot;https://scheme.example.com/payment_initiation&quot;,
+         &quot;actions&quot;: [
+            &quot;initiate&quot;,
+            &quot;status&quot;,
+            &quot;cancel&quot;
+         ],
+         &quot;locations&quot;: [
+            &quot;https://example.com/payments&quot;
+         ],
+         &quot;instructedAmount&quot;: {
+            &quot;currency&quot;: &quot;EUR&quot;,
+            &quot;amount&quot;: &quot;123.50&quot;
+         },
+         &quot;creditorName&quot;: &quot;Merchant A&quot;,
+         &quot;creditorAccount&quot;: {
+            &quot;iban&quot;: &quot;DE02100100109307118603&quot;
+         },
+         &quot;remittanceInformationUnstructured&quot;: &quot;Ref Number Merchant&quot;
+      }
+   ],
+   &quot;debtorAccount&quot;: {
+      &quot;iban&quot;: &quot;DE40100100103307118608&quot;,
+      &quot;user_role&quot;: &quot;owner&quot;
+   }
+}
+
+</code></pre>
+<p>In this case, the AS added the following example claims to the JWT-based access token:</p>
+<p><strong>sub</strong>: indicates the user for which the client is asking for payment initiation.
+<strong>txn</strong>: transaction id used to trace the transaction across the services of provider <a href="http://example.com">example.com</a>
+<strong>debtorAccount</strong>: API-specific field containing the debtor account. In the example, this account was not passed in the authorization_details but was selected by the user during the authorization process. The field user_role conveys the role the user has with respect to this particular account. In this case, they are the owner. This data is used for access control at the payment API (the RS).</p>
+<h4 id="errors-1">Errors</h4>
+<p>The AuthZ response is the same as an OAuth 2.x response - however the authorization code may be a JWT that contains the authorization details.</p>
+<p>The standard is thin on how to deal with errors in the authorization request - it is mostly focused on errors related to the data type (i.e. does not suggest range values) and does not provide any opportunity to communicate the reason for the error. (i.e. is it an authorization issue or a data issue).</p>
+<p>Authorization Errors defined by the RAR spec are focused on type excepts - no standards are defined for Authroization based exceptions</p>
+<p><a href="https://datatracker.ietf.org/doc/html/rfc9396#name-authorization-error-response">https://datatracker.ietf.org/doc/html/rfc9396#name-authorization-error-response</a></p>
+<h3 id="grant-management-api-response">Grant Management API Response</h3>
+<p>The token response of an AS supporting the Grant Management API will include the grant_id that enables the client to manage and enquire on the grant.</p>
+<p>The /grants API returns a JSON-formatted response that contains the grant_id and the grant status.  The provides the client insight into grant is holds, enabling monitoring-discovery of any latent grants that may be provided to the client through the consent process - e.g. multi-party consent flows.</p>
+<p>Note this response is not an access token.</p>
+<pre><code class="language-http"><span class="hljs-meta">HTTP/1.1</span> <span class="hljs-number">200</span> OK
+<span class="hljs-attribute">Cache-Control</span><span class="hljs-punctuation">: </span>no-cache, no-store
+<span class="hljs-attribute">Content-Type</span><span class="hljs-punctuation">: </span>application/json
+
+<span class="language-prolog">{
+   <span class="hljs-string">&quot;scopes&quot;</span>:[
+      {
+         <span class="hljs-string">&quot;scope&quot;</span>:<span class="hljs-string">&quot;contacts read write&quot;</span>,
+         <span class="hljs-string">&quot;resources&quot;</span>:[
+            <span class="hljs-string">&quot;https://rs.example.com/api&quot;</span>
+         ]
+      },
+      {
+         <span class="hljs-string">&quot;scope&quot;</span>:<span class="hljs-string">&quot;openid&quot;</span>
+      }
+   ],
+   <span class="hljs-string">&quot;claims&quot;</span>:[
+      <span class="hljs-string">&quot;given_name&quot;</span>,
+      <span class="hljs-string">&quot;nickname&quot;</span>,
+      <span class="hljs-string">&quot;email&quot;</span>,
+      <span class="hljs-string">&quot;email_verified&quot;</span>
+   ],
+   <span class="hljs-string">&quot;authorization_details&quot;</span>:[
+      {
+         <span class="hljs-string">&quot;type&quot;</span>:<span class="hljs-string">&quot;account_information&quot;</span>,
+         <span class="hljs-string">&quot;actions&quot;</span>:[
+            <span class="hljs-string">&quot;list_accounts&quot;</span>,
+            <span class="hljs-string">&quot;read_balances&quot;</span>,
+            <span class="hljs-string">&quot;read_transactions&quot;</span>
+         ],
+         <span class="hljs-string">&quot;locations&quot;</span>:[
+            <span class="hljs-string">&quot;https://example.com/accounts&quot;</span>
+         ]
+      }
+   ]
+}
+</span></code></pre>
+<h2 id="specifications">Specifications</h2>
+<h3 id="general-method-for-requesting-authorization-over-http">General Method for Requesting Authorization over http</h3>
+<p>OAuth 2.0: <a href="https://datatracker.ietf.org/doc/html/rfc6749">https://datatracker.ietf.org/doc/html/rfc6749</a>
+The OAuth 2.0 Authorization Framework: Bearer Token Usage: <a href="https://www.rfc-editor.org/rfc/rfc6750">https://www.rfc-editor.org/rfc/rfc6750</a>
+Assertion Framework for OAuth 2.0 Client Authentication and Authorization Grants: <a href="https://www.rfc-editor.org/rfc/rfc7521.html">https://www.rfc-editor.org/rfc/rfc7521.html</a></p>
+<h3 id="methods-for-requesting-authorization-to-specialized-data-types">Methods for Requesting Authorization to specialized Data Types</h3>
+<p>OpenID Connect Core: <a href="https://openid.net/specs/openid-connect-core-1_0.html">https://openid.net/specs/openid-connect-core-1_0.html</a>  - for Authorization to identity data in via id_token and /userInfo API
+Self Issued OIDC <a href="https://openid.net/specs/openid-connect-self-issued-v2-1_0.html">https://openid.net/specs/openid-connect-self-issued-v2-1_0.html</a> -
+OpenID for Verifiable Presentations: <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html</a> - for Authorization to vp_token
+OpenID for Verifiable Credential Issuance: <a href="https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html">https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html</a> - for Authorization at a Credential Endpoint.</p>
+<h3 id="alternate-methods-for-requesting-authorization">Alternate Methods for Requesting Authorization</h3>
+<p>Rich Authorization Requests:  <a href="https://datatracker.ietf.org/doc/html/rfc9396">https://datatracker.ietf.org/doc/html/rfc9396</a>
+JWT-Secured Authorization Request (JAR): <a href="https://datatracker.ietf.org/doc/html/rfc9101">https://datatracker.ietf.org/doc/html/rfc9101</a>
+Pushed Authorization Requests (PAR): <a href="https://datatracker.ietf.org/doc/html/rfc9126">https://datatracker.ietf.org/doc/html/rfc9126</a></p>
+<h3 id="methods-for-inspecting-and-managing-authorization-grants">Methods for Inspecting and Managing Authorization Grants</h3>
+<p>Grant Management API: <a href="https://openid.net/specs/fapi-grant-management-01.html">https://openid.net/specs/fapi-grant-management-01.html</a></p>
+<h3 id="authorization-semantics">Authorization Semantics</h3>
+<p>Resource Indictors for OAuth: <a href="https://www.rfc-editor.org/rfc/rfc8707.html">https://www.rfc-editor.org/rfc/rfc8707.html</a>
+JSON Web Token (JWT) Profile for OAuth 2.0 Access Tokens: <a href="https://datatracker.ietf.org/doc/html/rfc9068">https://datatracker.ietf.org/doc/html/rfc9068</a>
+OAuth 2.0 Step Up Authentication Challenge Protocol <a href="https://datatracker.ietf.org/doc/rfc9470/">https://datatracker.ietf.org/doc/rfc9470/</a></p>
+
+            
+            
+        </body>
+        </html>
